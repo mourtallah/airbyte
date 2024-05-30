@@ -122,7 +122,7 @@ def retry_connection_handler(**kwargs):
         logger.info(f"Caught retryable error after {details['tries']} tries. Waiting {details['wait']} more seconds then retrying...")
 
     def giveup_handler(exc):
-        if isinstance(exc, (HubspotInvalidAuth, HubspotAccessDenied)):
+        if isinstance(exc, (HubspotInvalidAuth, HubspotAccessDenied, json.JSONDecodeError)):
             return True
         return exc.response is not None and HTTPStatus.BAD_REQUEST <= exc.response.status_code < HTTPStatus.INTERNAL_SERVER_ERROR
 
