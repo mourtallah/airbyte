@@ -12,41 +12,5 @@ import io.airbyte.cdk.integrations.destination.staging.StagingOperations
 import io.airbyte.commons.json.Jsons.jsonNode
 import io.airbyte.protocol.models.v0.AirbyteRecordMessage
 
-abstract class SnowflakeSqlStagingOperations : SnowflakeSqlOperations(), StagingOperations {
-    /**
-     * This method is used in Check connection method to make sure that user has the Write
-     * permission
-     */
-    @Suppress("deprecation")
-    @Throws(Exception::class)
-    internal fun attemptWriteToStage(
-        outputSchema: String?,
-        stageName: String,
-        database: JdbcDatabase?
-    ) {
-        val csvSerializedBuffer =
-            CsvSerializedBuffer(
-                FileBuffer(CsvSerializedBuffer.CSV_GZ_SUFFIX),
-                StagingDatabaseCsvSheetGenerator(
-                    JavaBaseConstants.DestinationColumns.V2_WITHOUT_META
-                ),
-                true
-            )
-
-        // create a dummy stream\records that will bed used to test uploading
-        csvSerializedBuffer.accept(
-            AirbyteRecordMessage()
-                .withData(jsonNode(mapOf("testKey" to "testValue")))
-                .withEmittedAt(System.currentTimeMillis())
-        )
-        csvSerializedBuffer.flush()
-
-        uploadRecordsToStage(
-            database,
-            csvSerializedBuffer,
-            outputSchema,
-            stageName,
-            if (stageName.endsWith("/")) stageName else "$stageName/"
-        )
-    }
+abstract class SnowflakeSqlStagingOperations : SnowflakeSqlOperations() {
 }

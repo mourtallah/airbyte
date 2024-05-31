@@ -19,9 +19,11 @@ import net.snowflake.client.jdbc.SnowflakeSQLException
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
-open class SnowflakeSqlOperations : JdbcSqlOperations(), SqlOperations {
+open class SnowflakeSqlOperations {
+    protected val schemaSet: MutableSet<String> = HashSet()
+
     @Throws(Exception::class)
-    override fun createSchemaIfNotExists(database: JdbcDatabase?, schemaName: String) {
+     fun createSchemaIfNotExists(database: JdbcDatabase?, schemaName: String) {
         try {
             if (!schemaSet.contains(schemaName) && !isSchemaExists(database, schemaName)) {
                 // 1s1t is assuming a lowercase airbyte_internal schema name, so we need to quote it
@@ -33,14 +35,12 @@ open class SnowflakeSqlOperations : JdbcSqlOperations(), SqlOperations {
         }
     }
 
-    override fun createTableQuery(
-        database: JdbcDatabase?,
-        schemaName: String?,
+    fun createTableQuery(
+                schemaName: String?,
         tableName: String?
-    ): String? {
-        val retentionPeriodDays = retentionPeriodDaysFromConfigSingleton
-        return String.format(
-            """
+            ): String? {
+                val retentionPeriodDays = retentionPeriodDaysFromConfigSingleton
+                return String.format("""
         CREATE TABLE IF NOT EXISTS "%s"."%s" (
           "%s" VARCHAR PRIMARY KEY,
           "%s" TIMESTAMP WITH TIME ZONE DEFAULT current_timestamp(),
@@ -48,22 +48,22 @@ open class SnowflakeSqlOperations : JdbcSqlOperations(), SqlOperations {
           "%s" VARIANT
         ) data_retention_time_in_days = %d;
         """.trimIndent(),
-            schemaName,
-            tableName,
-            JavaBaseConstants.COLUMN_NAME_AB_RAW_ID,
-            JavaBaseConstants.COLUMN_NAME_AB_EXTRACTED_AT,
-            JavaBaseConstants.COLUMN_NAME_AB_LOADED_AT,
-            JavaBaseConstants.COLUMN_NAME_DATA,
-            retentionPeriodDays
-        )
-    }
+                        schemaName,
+                        tableName,
+                        JavaBaseConstants.COLUMN_NAME_AB_RAW_ID,
+                        JavaBaseConstants.COLUMN_NAME_AB_EXTRACTED_AT,
+                        JavaBaseConstants.COLUMN_NAME_AB_LOADED_AT,
+                        JavaBaseConstants.COLUMN_NAME_DATA,
+                        retentionPeriodDays
+                            )
+            }
 
     @Throws(Exception::class)
-    override fun isSchemaExists(database: JdbcDatabase?, schemaName: String?): Boolean {
+     fun isSchemaExists(database: JdbcDatabase?, schemaName: String?): Boolean {
         try {
-            database!!.unsafeQuery(SHOW_SCHEMAS).use { results ->
+            database!!.unsafeQuery(JdbcSqlOperations.SHOW_SCHEMAS).use { results ->
                 return results
-                    .map { schemas: JsonNode -> schemas[NAME].asText() }
+                    .map { schemas: JsonNode -> schemas[JdbcSqlOperations.NAME].asText() }
                     .anyMatch { anObject: String? -> schemaName.equals(anObject) }
             }
         } catch (e: Exception) {
@@ -71,20 +71,8 @@ open class SnowflakeSqlOperations : JdbcSqlOperations(), SqlOperations {
         }
     }
 
-    override fun truncateTableQuery(
-        database: JdbcDatabase?,
-        schemaName: String?,
-        tableName: String?
-    ): String {
-        return String.format("TRUNCATE TABLE \"%s\".\"%s\";\n", schemaName, tableName)
-    }
-
-    override fun dropTableIfExistsQuery(schemaName: String?, tableName: String?): String {
-        return String.format("DROP TABLE IF EXISTS \"%s\".\"%s\";\n", schemaName, tableName)
-    }
-
     @Throws(SQLException::class)
-    public override fun insertRecordsInternal(
+    public  fun insertRecordsInternal(
         database: JdbcDatabase,
         records: List<PartialAirbyteMessage>,
         schemaName: String?,
@@ -114,18 +102,6 @@ open class SnowflakeSqlOperations : JdbcSqlOperations(), SqlOperations {
         insertRawRecordsInSingleQuery(insertQuery, recordQuery, database, records)
     }
 
-    @Throws(Exception::class)
-    override fun insertRecordsInternalV2(
-        database: JdbcDatabase,
-        records: List<PartialAirbyteMessage>,
-        schemaName: String?,
-        tableName: String?
-    ) {
-        // Snowflake doesn't have standard inserts... so we don't do this at real runtime.
-        // Intentionally do nothing. This method is called from the `check` method.
-        // It probably shouldn't be, but this is the easiest path to getting this working.
-    }
-
     protected fun generateFilesList(files: List<String>): String {
         if (0 < files.size && files.size < MAX_FILES_IN_LOADING_QUERY_LIMIT) {
             // see
@@ -142,7 +118,7 @@ open class SnowflakeSqlOperations : JdbcSqlOperations(), SqlOperations {
         }
     }
 
-    override fun checkForKnownConfigExceptions(e: Exception?): Optional<ConfigErrorException> {
+     fun checkForKnownConfigExceptions(e: Exception?): Optional<ConfigErrorException> {
         if (e is SnowflakeSQLException && e.message!!.contains(NO_PRIVILEGES_ERROR_MESSAGE)) {
             return Optional.of(
                 ConfigErrorException(

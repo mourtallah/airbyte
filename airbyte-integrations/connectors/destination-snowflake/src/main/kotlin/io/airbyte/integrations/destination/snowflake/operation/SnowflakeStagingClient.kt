@@ -20,7 +20,7 @@ import java.util.*
 class SnowflakeStagingClient(
     private val nameTransformer: NamingConventionTransformer
 ) : SnowflakeSqlStagingOperations() {
-    override fun getStageName(namespace: String?, streamName: String?): String {
+    fun getStageName(namespace: String?, streamName: String?): String {
         return java.lang.String.join(
             ".",
             '"'.toString() + nameTransformer.convertStreamName(namespace!!) + '"',
@@ -28,11 +28,8 @@ class SnowflakeStagingClient(
         )
     }
 
-    override fun getStagingPath(
+    fun getStagingPath(
         connectionId: UUID?,
-        namespace: String?,
-        streamName: String?,
-        outputTableName: String?,
         writeDatetime: Instant?
     ): String? {
         // see https://docs.snowflake.com/en/user-guide/data-load-considerations-stage.html
@@ -50,10 +47,9 @@ class SnowflakeStagingClient(
     }
 
     @Throws(IOException::class)
-    override fun uploadRecordsToStage(
+    fun uploadRecordsToStage(
         database: JdbcDatabase?,
         recordsData: SerializableBuffer?,
-        schemaName: String?,
         stageName: String?,
         stagingPath: String?
     ): String {
@@ -151,7 +147,7 @@ class SnowflakeStagingClient(
     }
 
     @Throws(Exception::class)
-    override fun createStageIfNotExists(database: JdbcDatabase?, stageName: String?) {
+    fun createStageIfNotExists(database: JdbcDatabase?, stageName: String?) {
         val query = getCreateStageQuery(stageName)
         LOGGER.debug("Executing query: {}", query)
         try {
@@ -173,7 +169,7 @@ class SnowflakeStagingClient(
     }
 
     @Throws(SQLException::class)
-    override fun copyIntoTableFromStage(
+    fun copyIntoTableFromStage(
         database: JdbcDatabase?,
         stageName: String?,
         stagingPath: String?,
@@ -218,10 +214,9 @@ class SnowflakeStagingClient(
     }
 
     @Throws(Exception::class)
-    override fun dropStageIfExists(
+    fun dropStageIfExists(
         database: JdbcDatabase?,
         stageName: String?,
-        stagingPath: String?
     ) {
         try {
             val query = getDropQuery(stageName)
