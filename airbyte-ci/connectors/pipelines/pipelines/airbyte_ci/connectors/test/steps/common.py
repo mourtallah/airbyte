@@ -330,23 +330,9 @@ class LiveTests(Step):
             "--durations": ["3"],  # Show the 3 slowest tests in the report
         }
 
-    def test_command(self) -> List[str]:
-        """
-        This command:
-
-        1. Starts a Google Cloud SQL proxy running on localhost, which is used by the connection-retriever to connect to postgres.
-        2. Gets the PID of the proxy so it can be killed once done.
-        3. Runs the validation & regression tests.
-        4. Kills the proxy, and waits for it to exit.
-        5. Exits with the tests' exit code.
-        We need to explicitly kill the proxy in order to allow the GitHub Action to exit.
-        An alternative that we can consider is to run the proxy as a separate service.
-
-        (See https://docs.dagger.io/manuals/developer/python/328492/services/ and https://cloud.google.com/sql/docs/postgres/sql-proxy#cloud-sql-auth-proxy-docker-image)
-        """
-        run_proxy = "./cloud-sql-proxy prod-ab-cloud-proj:us-west3:prod-pgsql-replica --credentials-file /tmp/credentials.json"
+    def _test_command(self) -> str:
         selected_streams = ["--stream", self.selected_streams] if self.selected_streams else []
-        run_pytest = " ".join(
+        return " ".join(
             [
                 "poetry",
                 "run",
@@ -371,11 +357,28 @@ class LiveTests(Step):
             ]
             + selected_streams
         )
+
+    def _run_command_with_proxy(self, command: str) -> List[str]:
+        """
+        This command:
+
+        1. Starts a Google Cloud SQL proxy running on localhost, which is used by the connection-retriever to connect to postgres.
+           This is required for secure access to our internal tools.
+        2. Gets the PID of the proxy so it can be killed once done.
+        3. Runs the command that was passed in as input.
+        4. Kills the proxy, and waits for it to exit.
+        5. Exits with the command's exit code.
+        We need to explicitly kill the proxy in order to allow the GitHub Action to exit.
+        An alternative that we can consider is to run the proxy as a separate service.
+
+        (See https://docs.dagger.io/manuals/developer/python/328492/services/ and https://cloud.google.com/sql/docs/postgres/sql-proxy#cloud-sql-auth-proxy-docker-image)
+        """
+        run_proxy = "./cloud-sql-proxy prod-ab-cloud-proj:us-west3:prod-pgsql-replica --credentials-file /tmp/credentials.json"
         run_pytest_with_proxy = dedent(
             f"""
         {run_proxy} &
         proxy_pid=$!
-        {run_pytest}
+        {command}
         pytest_exit=$?
         kill $proxy_pid
         wait $proxy_pid
@@ -417,7 +420,7 @@ class LiveTests(Step):
             StepResult: Failure or success of the regression tests with stdout and stderr.
         """
         container = await self._build_test_container(await connector_under_test_container.id())
-        container = container.with_(hacks.never_fail_exec(self.test_command()))
+        container = container.with_(hacks.never_fail_exec(self._run_command_with_proxy(self._test_command())))
         tests_artifacts_dir = str(self.tests_artifacts_dir)
         path_to_report = f"{tests_artifacts_dir}/session_{self.run_id}/report.html"
 
@@ -541,23 +544,9 @@ class RegressionTests(LiveTests):
     context: ConnectorContext
     title = "Regression tests"
 
-    def test_command(self) -> List[str]:
-        """
-        This command:
-
-        1. Starts a Google Cloud SQL proxy running on localhost, which is used by the connection-retriever to connect to postgres.
-        2. Gets the PID of the proxy so it can be killed once done.
-        3. Runs the regression tests.
-        4. Kills the proxy, and waits for it to exit.
-        5. Exits with the regression tests' exit code.
-        We need to explicitly kill the proxy in order to allow the GitHub Action to exit.
-        An alternative that we can consider is to run the proxy as a separate service.
-
-        (See https://docs.dagger.io/manuals/developer/python/328492/services/ and https://cloud.google.com/sql/docs/postgres/sql-proxy#cloud-sql-auth-proxy-docker-image)
-        """
-        run_proxy = "./cloud-sql-proxy prod-ab-cloud-proj:us-west3:prod-pgsql-replica --credentials-file /tmp/credentials.json"
+    def _test_command(self) -> str:
         selected_streams = ["--stream", self.selected_streams] if self.selected_streams else []
-        run_pytest = " ".join(
+        return " ".join(
             [
                 "poetry",
                 "run",
@@ -582,15 +571,4 @@ class RegressionTests(LiveTests):
             ]
             + selected_streams
         )
-        run_pytest_with_proxy = dedent(
-            f"""
-        {run_proxy} &
-        proxy_pid=$!
-        {run_pytest}
-        pytest_exit=$?
-        kill $proxy_pid
-        wait $proxy_pid
-        exit $pytest_exit
-        """
-        )
-        return ["bash", "-c", f"'{run_pytest_with_proxy}'"]
+
