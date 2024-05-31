@@ -24,7 +24,6 @@ import io.airbyte.integrations.base.destination.typing_deduping.Struct
 import io.airbyte.integrations.base.destination.typing_deduping.Union
 import io.airbyte.integrations.base.destination.typing_deduping.UnsupportedOneOf
 import io.airbyte.integrations.destination.snowflake.SnowflakeDatabaseUtils
-import io.airbyte.integrations.destination.snowflake.SnowflakeSqlOperations
 import io.airbyte.integrations.destination.snowflake.migrations.SnowflakeState
 import io.airbyte.protocol.models.v0.DestinationSyncMode
 import java.sql.Connection
@@ -130,11 +129,11 @@ class SnowflakeDestinationHandler(
                                 .createStatement()
                                 .executeQuery(
                                     StringSubstitutor(
-                                        java.util.Map.of(
-                                            "raw_table",
-                                            id.rawTableId(SnowflakeSqlGenerator.QUOTE)
+                                            java.util.Map.of(
+                                                "raw_table",
+                                                id.rawTableId(SnowflakeSqlGenerator.QUOTE)
+                                            )
                                         )
-                                    )
                                         .replace(
                                             """
                 WITH MIN_TS AS (
@@ -165,7 +164,7 @@ class SnowflakeDestinationHandler(
                 rawTableExists = true,
                 hasUnprocessedRecords = true,
                 maxProcessedTimestamp =
-                minUnloadedTimestamp.map { text: String? -> Instant.parse(text) }
+                    minUnloadedTimestamp.map { text: String? -> Instant.parse(text) }
             )
         }
 
@@ -186,11 +185,11 @@ class SnowflakeDestinationHandler(
                                 .createStatement()
                                 .executeQuery(
                                     StringSubstitutor(
-                                        java.util.Map.of(
-                                            "raw_table",
-                                            id.rawTableId(SnowflakeSqlGenerator.QUOTE)
+                                            java.util.Map.of(
+                                                "raw_table",
+                                                id.rawTableId(SnowflakeSqlGenerator.QUOTE)
+                                            )
                                         )
-                                    )
                                         .replace(
                                             """
                 WITH MAX_TS AS (
@@ -246,7 +245,7 @@ class SnowflakeDestinationHandler(
                     } else {
                         e.message
                     }
-                throw SnowflakeSqlOperations.checkForKnownConfigExceptions(e).orElseThrow {
+                throw SnowflakeDatabaseUtils.checkForKnownConfigExceptions(e).orElseThrow {
                     RuntimeException(trimmedMessage, e)
                 }
             }
@@ -269,7 +268,7 @@ class SnowflakeDestinationHandler(
         val abRawIdColumnName: String =
             JavaBaseConstants.COLUMN_NAME_AB_RAW_ID.uppercase(Locale.getDefault())
         return existingTable.columns.containsKey(abRawIdColumnName) &&
-                toJdbcTypeName(AirbyteProtocolType.STRING) ==
+            toJdbcTypeName(AirbyteProtocolType.STRING) ==
                 existingTable.columns[abRawIdColumnName]!!.type
     }
 
@@ -277,7 +276,7 @@ class SnowflakeDestinationHandler(
         val abExtractedAtColumnName: String =
             JavaBaseConstants.COLUMN_NAME_AB_EXTRACTED_AT.uppercase(Locale.getDefault())
         return existingTable.columns.containsKey(abExtractedAtColumnName) &&
-                toJdbcTypeName(AirbyteProtocolType.TIMESTAMP_WITH_TIMEZONE) ==
+            toJdbcTypeName(AirbyteProtocolType.TIMESTAMP_WITH_TIMEZONE) ==
                 existingTable.columns[abExtractedAtColumnName]!!.type
     }
 
@@ -285,7 +284,7 @@ class SnowflakeDestinationHandler(
         val abMetaColumnName: String =
             JavaBaseConstants.COLUMN_NAME_AB_META.uppercase(Locale.getDefault())
         return existingTable.columns.containsKey(abMetaColumnName) &&
-                "VARIANT" == existingTable.columns[abMetaColumnName]!!.type
+            "VARIANT" == existingTable.columns[abMetaColumnName]!!.type
     }
 
     @SuppressFBWarnings("NP_PARAMETER_MUST_BE_NONNULL_BUT_MARKED_AS_NULLABLE")
@@ -299,8 +298,8 @@ class SnowflakeDestinationHandler(
         // TODO: Unify this using name transformer or something.
         if (
             !isAirbyteRawIdColumnMatch(existingTable) ||
-            !isAirbyteExtractedAtColumnMatch(existingTable) ||
-            !isAirbyteMetaColumnMatch(existingTable)
+                !isAirbyteExtractedAtColumnMatch(existingTable) ||
+                !isAirbyteMetaColumnMatch(existingTable)
         ) {
             // Missing AB meta columns from final table, we need them to do proper T+D so trigger
             // soft-reset
@@ -334,8 +333,8 @@ class SnowflakeDestinationHandler(
                 .collect(
                     { LinkedHashMap() },
                     {
-                            map: LinkedHashMap<String, String>,
-                            column: Map.Entry<String, ColumnDefinition> ->
+                        map: LinkedHashMap<String, String>,
+                        column: Map.Entry<String, ColumnDefinition> ->
                         map[column.key] = column.value.type
                     },
                     { obj: LinkedHashMap<String, String>, m: LinkedHashMap<String, String>? ->
@@ -371,10 +370,10 @@ class SnowflakeDestinationHandler(
                     var isFinalTableEmpty = true
                     val isFinalTablePresent =
                         existingTables.containsKey(namespace) &&
-                                existingTables[namespace]!!.containsKey(name)
+                            existingTables[namespace]!!.containsKey(name)
                     val hasRowCount =
                         tableRowCounts.containsKey(namespace) &&
-                                tableRowCounts[namespace]!!.containsKey(name)
+                            tableRowCounts[namespace]!!.containsKey(name)
                     if (isFinalTablePresent) {
                         val existingTable = existingTables[namespace]!![name]
                         isSchemaMismatch =
@@ -424,7 +423,7 @@ class SnowflakeDestinationHandler(
     }
 
     private fun toJdbcTypeName(airbyteProtocolType: AirbyteProtocolType): String {
-        return SnowflakeSqlGenerator.toSqlTypeName(airbyteProtocolType)
+        return SnowflakeDatabaseUtils.toSqlTypeName(airbyteProtocolType)
     }
 
     override fun createNamespaces(schemas: Set<String>) {
@@ -438,7 +437,7 @@ class SnowflakeDestinationHandler(
                     database.execute(String.format("CREATE SCHEMA IF NOT EXISTS \"%s\";", it))
                 }
             } catch (e: Exception) {
-                throw SnowflakeSqlOperations.checkForKnownConfigExceptions(e).orElseThrow { e }
+                throw SnowflakeDatabaseUtils.checkForKnownConfigExceptions(e).orElseThrow { e }
             }
         }
     }
@@ -451,7 +450,7 @@ class SnowflakeDestinationHandler(
                     .anyMatch { anObject: String -> schema == anObject }
             }
         } catch (e: Exception) {
-            throw SnowflakeSqlOperations.checkForKnownConfigExceptions(e).orElseThrow { e }
+            throw SnowflakeDatabaseUtils.checkForKnownConfigExceptions(e).orElseThrow { e }
         }
     }
 
