@@ -26,6 +26,7 @@ import io.airbyte.integrations.base.destination.typing_deduping.ParsedCatalog
 import io.airbyte.integrations.base.destination.typing_deduping.TyperDeduper
 import io.airbyte.integrations.base.destination.typing_deduping.migrators.Migration
 import io.airbyte.integrations.destination.snowflake.migrations.SnowflakeState
+import io.airbyte.integrations.destination.snowflake.operation.SnowflakeStagingClient
 import io.airbyte.integrations.destination.snowflake.typing_deduping.SnowflakeDestinationHandler
 import io.airbyte.integrations.destination.snowflake.typing_deduping.SnowflakeSqlGenerator
 import io.airbyte.integrations.destination.snowflake.typing_deduping.SnowflakeV1V2Migrator
@@ -54,7 +55,7 @@ constructor(
 
     override fun check(config: JsonNode): AirbyteConnectionStatus? {
         val snowflakeInternalStagingSqlOperations =
-            SnowflakeInternalStagingSqlOperations(nameTransformer)
+            SnowflakeStagingClient(nameTransformer)
         val dataSource = getDataSource(config)
         try {
             val database = getDatabase(dataSource)
@@ -171,7 +172,7 @@ constructor(
         return builder(
                 outputRecordCollector,
                 database,
-                SnowflakeInternalStagingSqlOperations(nameTransformer),
+                SnowflakeStagingClient(nameTransformer),
                 nameTransformer,
                 config,
                 catalog,
@@ -220,7 +221,7 @@ constructor(
             outputSchema: String,
             database: JdbcDatabase,
             namingResolver: NamingConventionTransformer,
-            sqlOperations: SnowflakeInternalStagingSqlOperations
+            sqlOperations: SnowflakeStagingClient
         ) {
             // verify we have permissions to create/drop stage
 

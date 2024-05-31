@@ -1,24 +1,23 @@
-/*
- * Copyright (c) 2023 Airbyte, Inc., all rights reserved.
- */
-package io.airbyte.integrations.destination.snowflake
+package io.airbyte.integrations.destination.snowflake.operation
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings
 import io.airbyte.cdk.db.jdbc.JdbcDatabase
 import io.airbyte.cdk.integrations.destination.NamingConventionTransformer
 import io.airbyte.cdk.integrations.destination.record_buffer.SerializableBuffer
-import io.airbyte.commons.string.Strings.join
+import io.airbyte.commons.string.Strings
+import io.airbyte.integrations.destination.snowflake.SnowflakeSqlOperations
+import io.airbyte.integrations.destination.snowflake.SnowflakeSqlStagingOperations
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.sql.SQLException
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.util.*
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
 
 @SuppressFBWarnings("NP_PARAMETER_MUST_BE_NONNULL_BUT_MARKED_AS_NULLABLE")
-class SnowflakeInternalStagingSqlOperations(
+class SnowflakeStagingClient(
     private val nameTransformer: NamingConventionTransformer
 ) : SnowflakeSqlStagingOperations() {
     override fun getStageName(namespace: String?, streamName: String?): String {
@@ -81,7 +80,7 @@ class SnowflakeInternalStagingSqlOperations(
             throw RuntimeException(
                 String.format(
                     "Exceptions thrown while uploading records into stage: %s",
-                    join(exceptionsThrown, "\n")
+                    Strings.join(exceptionsThrown, "\n")
                 )
             )
         }
